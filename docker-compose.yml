@@ -1,0 +1,67 @@
+# Dos contenedores comunicados por una red interna de Docker:
+#   app -> Node.js + Express (puerto 3000 publicado al host)
+#   db  -> PostgreSQL 16 (sin puerto publicado: solo la app puede hablar con ella)
+name: gestor-tareas
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: tareas-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Define POSTGRES_DB en el archivo .env}
+      POSTGRES_USER: ${POSTGRES_USER:?Define POSTGRES_USER en el archivo .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en el archivo .env}
+      APP_DB_USER: ${APP_DB_USER:?Define APP_DB_USER en el archivo .env}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?Define APP_DB_PASSWORD en el archivo .env}
+    volumes:
+      - datos_postgres:/var/lib/postgresql/data      # persistencia de los datos
+      - ./db/init:/docker-entrypoint-initdb.d:ro     # esquema y usuario de la app (solo lectura)
+    networks:
+      - red_tareas
+    healthcheck:
+      # -h 127.0.0.1 evita dar "listo" mientras PostgreSQL todavía ejecuta los scripts de inicio
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+
+  app:
+    build:
+      context: ./app
+    image: gestor-tareas-app:1.0.0
+    container_name: tareas-app
+    restart: unless-stopped
+    environment:
+      PORT: 3000
+      DB_HOST: db            # nombre del servicio: Docker lo resuelve por DNS dentro de la red
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB}
+      DB_USER: ${APP_DB_USER}
+      DB_PASSWORD: ${APP_DB_PASSWORD}
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    depends_on:
+      db:
+        condition: service_healthy   # la app arranca cuando PostgreSQL ya acepta conexiones
+    networks:
+      - red_tareas
+    read_only: true          # sistema de archivos del contenedor en solo lectura
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL                  # sin capacidades del kernel que la app no necesita
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  red_tareas:
+    name: red_tareas
+    driver: bridge
+
+volumes:
+  datos_postgres:
+    name: datos_postgres

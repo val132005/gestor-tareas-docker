@@ -1,0 +1,16 @@
+# Secretos
+.env
+
+# Dependencias y logs
+node_modules/
+npm-debug.log*
+
+# Borrador del informe (se entrega como PDF en la plataforma, no se publica)
+docs/Informe_Entrega1.docx
+docs/~$*
+
+# Sistema operativo y editores
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
