@@ -39,7 +39,7 @@ pipeline {
           if grep -nE '^[[:space:]]*[A-Z_]*(PASSWORD|SECRET|TOKEN)[A-Z_]*:[[:space:]]*[^[:space:]$]' docker-compose.yml; then
             echo "ERROR: docker-compose.yml tiene una contraseña escrita directamente"; exit 1
           fi
-          echo "OK: .env no está versionado y docker-compose.yml solo usa variables \${...}"
+          echo "OK: .env no está versionado y docker-compose.yml toma las contraseñas de variables del .env"
         '''
       }
     }
@@ -108,14 +108,15 @@ pipeline {
 
   post {
     failure {
-      sh 'docker compose logs --no-color || true'
-    }
-    always {
-      sh 'docker compose down -v --remove-orphans || true'
-      sh 'rm -f .env'
+      sh 'if [ -f .env ]; then docker compose logs --no-color; fi'
     }
     success {
       echo 'Pipeline completado: los contenedores app y db se construyeron y se comunican correctamente.'
+    }
+    cleanup {
+      // Se ejecuta al final, después de failure/success: apaga todo y borra el .env del workspace
+      sh 'if [ -f .env ]; then docker compose down -v --remove-orphans; fi'
+      sh 'rm -f .env'
     }
   }
 }
