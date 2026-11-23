@@ -1,4 +1,4 @@
-# Gestor de tareas — Integración Continua (Entrega 1: Docker)
+# Gestor de tareas — Integración Continua (Entrega 1: Docker · Entrega 2: Jenkins)
 
 ![CI](https://github.com/val132005/gestor-tareas-docker/actions/workflows/ci.yml/badge.svg)
 
@@ -28,7 +28,7 @@ Ambos se conectan a la red `red_tareas`. La app encuentra a la base de datos por
 ```bash
 git clone https://github.com/val132005/gestor-tareas-docker.git
 cd gestor-tareas-docker
-cp .env.example .env            # luego cambia las contraseñas dentro de .env
+cp .env.example .env            # luego escribe las contraseñas dentro de .env (van vacías)
 docker compose up -d --build    # construye la imagen de la app y levanta los 2 contenedores
 docker compose ps               # ambos deben aparecer como (healthy)
 ```
@@ -79,6 +79,20 @@ El workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) se ejecuta en
 1. **Pruebas unitarias:** `npm ci`, `npm audit` y `npm test` con Node 20.
 2. **Integración con Docker:** crea un `.env` con contraseñas aleatorias, valida el compose, levanta los contenedores con `--wait`, ejecuta `scripts/prueba-comunicacion.sh` y apaga todo con `docker compose down -v`.
 
+## Integración continua con Jenkins (Entrega 2)
+
+Jenkins es el gestor de operaciones del proyecto: corre en contenedores (carpeta [`jenkins/`](jenkins/)) y ejecuta el
+[`Jenkinsfile`](Jenkinsfile) con cada push a `main`. Ver [`jenkins/README.md`](jenkins/README.md).
+
+```bash
+cd jenkins
+docker compose up -d --build     # Jenkins en http://localhost:8081
+```
+
+Etapas: verificar secretos → pruebas unitarias en `node:20-alpine` → `.env` desde credenciales de Jenkins →
+validar compose → construir imagen → levantar `app` y `db` → `docker network inspect red_tareas` →
+`scripts/prueba-comunicacion.sh` → apagar y limpiar. GitHub Actions sigue activo en paralelo.
+
 ## Comandos útiles
 
 ```bash
@@ -99,6 +113,12 @@ docker compose down -v             # detener y BORRAR los datos
 │   ├── src/                # API, conexión a la BD y validaciones
 │   └── test/               # pruebas unitarias (node:test)
 ├── db/init/                # contenedor 2: scripts de inicio de PostgreSQL
+├── jenkins/                # Entrega 2: Jenkins en contenedores
+│   ├── Dockerfile          # Jenkins LTS + cliente Docker + plugins
+│   ├── plugins.txt
+│   ├── casc/jenkins.yaml   # Configuration as Code: usuario, credencial y job
+│   └── docker-compose.yml  # jenkins + docker:dind
+├── Jenkinsfile             # pipeline de Jenkins
 ├── scripts/prueba-comunicacion.sh
 ├── docs/arquitectura.png
 ├── docker-compose.yml
