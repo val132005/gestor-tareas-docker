@@ -1,0 +1,70 @@
+# Jenkins como gestor de operaciones del gestor de tareas (Entrega 2, semana 5).
+#   jenkins -> controlador de Jenkins (interfaz web en http://localhost:8081)
+#   docker  -> motor de Docker aislado (Docker-in-Docker) donde el pipeline
+#              construye y levanta los contenedores app y db
+# Se levanta desde esta carpeta con:  docker compose up -d --build
+name: jenkins-gestor-tareas
+
+services:
+  docker:
+    image: docker:29-dind
+    container_name: jenkins-docker
+    restart: unless-stopped
+    privileged: true                 # requerido por Docker-in-Docker
+    environment:
+      DOCKER_TLS_CERTDIR: /certs      # el motor solo acepta conexiones TLS (puerto 2376)
+    volumes:
+      - jenkins_docker_certs:/certs/client
+      - jenkins_home:/var/jenkins_home   # mismo espacio de trabajo que Jenkins
+      - jenkins_docker_data:/var/lib/docker
+    networks:
+      red_jenkins:
+        aliases:
+          - docker
+    command: --storage-driver=overlay2
+
+  jenkins:
+    build:
+      context: .
+    image: jenkins-gestor-tareas:1.0.0
+    container_name: jenkins
+    restart: unless-stopped
+    environment:
+      DOCKER_HOST: tcp://docker:2376
+      DOCKER_CERT_PATH: /certs/client
+      DOCKER_TLS_VERIFY: "1"
+    ports:
+      - "${JENKINS_PORT:-8081}:8080"   # interfaz web de Jenkins
+    volumes:
+      - jenkins_home:/var/jenkins_home            # persistencia de jobs, builds y plugins
+      - jenkins_docker_certs:/certs/client:ro
+      - ./casc:/var/jenkins_casc:ro               # configuración como código
+    secrets:
+      - jenkins_admin_password
+      - gestor_tareas_env
+    depends_on:
+      - docker
+    networks:
+      - red_jenkins
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  red_jenkins:
+    name: red_jenkins
+    driver: bridge
+
+volumes:
+  jenkins_home:
+    name: jenkins_home
+  jenkins_docker_certs:
+    name: jenkins_docker_certs
+  jenkins_docker_data:
+    name: jenkins_docker_data
+
+# Los secretos viven en jenkins/secrets/ (ignorada por Git). Ver jenkins/README.md
+secrets:
+  jenkins_admin_password:
+    file: ./secrets/jenkins_admin_password.txt
+  gestor_tareas_env:
+    file: ./secrets/gestor-tareas.env

@@ -1,0 +1,18 @@
+# Plugins que se instalan en la imagen de Jenkins (jenkins-plugin-cli)
+# Integración con Git y GitHub
+git
+github
+# Pipelines declarativos (Jenkinsfile) y su visualización por etapas
+workflow-aggregator
+pipeline-stage-view
+pipeline-graph-view
+# Ejecutar etapas dentro de contenedores Docker (agent { docker { ... } })
+docker-workflow
+# Credenciales: guardar el .env como "Secret file" y usarlo en el pipeline
+credentials
+credentials-binding
+# Configuración como código (JCasC) y creación del job (Job DSL)
+configuration-as-code
+job-dsl
+# Marca de tiempo en cada línea del log
+timestamper

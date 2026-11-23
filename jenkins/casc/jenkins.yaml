@@ -1,0 +1,72 @@
+# Configuration as Code (JCasC): todo lo que normalmente se hace a mano en la
+# interfaz de Jenkins queda versionado aquí y se aplica en cada arranque.
+jenkins:
+  systemMessage: "Jenkins del proyecto Gestor de tareas - Integración Continua (Entrega 2)"
+  numExecutors: 2
+  mode: NORMAL
+  # Usuario administrador propio; la contraseña llega como secreto de Docker
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: "admin"
+          name: "Administrador del proyecto"
+          password: "${readFile:/run/secrets/jenkins_admin_password}"
+  # Solo los usuarios autenticados pueden ver y ejecutar; nada para anónimos
+  authorizationStrategy:
+    loggedInUsersCanDoAnything:
+      allowAnonymousRead: false
+  # Protección CSRF activa (crumb estándar de Jenkins)
+  crumbIssuer: "standard"
+
+unclassified:
+  location:
+    url: "http://localhost:8081/"
+
+# El .env del proyecto se guarda cifrado en Jenkins como credencial "Secret file"
+credentials:
+  system:
+    domainCredentials:
+      - credentials:
+          - file:
+              scope: GLOBAL
+              id: "gestor-tareas-env"
+              description: "Archivo .env del gestor de tareas (contraseñas de PostgreSQL)"
+              fileName: ".env"
+              secretBytes: "${readFileBase64:/run/secrets/gestor_tareas_env}"
+
+# Job de tipo Pipeline que lee el Jenkinsfile del repositorio de GitHub
+jobs:
+  - script: |
+      pipelineJob('gestor-tareas') {
+        displayName('Gestor de tareas - CI')
+        description('Pipeline de integración continua: pruebas, construcción de los contenedores app y db y prueba de comunicación entre ellos.')
+        properties {
+          githubProjectUrl('https://github.com/val132005/gestor-tareas-docker/')
+          pipelineTriggers {
+            triggers {
+              githubPush()
+              pollSCM {
+                scmpoll_spec('H/2 * * * *')
+              }
+            }
+          }
+        }
+        logRotator {
+          numToKeep(20)
+        }
+        definition {
+          cpsScm {
+            scm {
+              git {
+                remote {
+                  url('https://github.com/val132005/gestor-tareas-docker.git')
+                }
+                branch('*/main')
+              }
+            }
+            scriptPath('Jenkinsfile')
+            lightweight(true)
+          }
+        }
+      }
